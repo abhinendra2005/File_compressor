@@ -1,39 +1,3 @@
-/**
- * Huffman Coding Lossless File Compressor with 'Store Mode' Fallback
- * 
- * Explanation of Bit-Packing and Unpacking Logic:
- * 
- * 1. Bit-Packing (BitWriter):
- *    - To write compressed data, we map each source character to a variable-length Huffman code (a string of '0' and '1' characters).
- *    - Instead of writing these characters directly to disk as text bytes, we pack the bits
- *      into bytes (unsigned char) using bitwise operators:
- *      - We maintain a single-byte buffer (`uint8_t buffer`) and a counter (`bitCount`) of bits written to the buffer.
- *      - For each bit '0' or '1', we shift the buffer left by 1 (`buffer << 1`) and bitwise-OR the new bit (`buffer | bit`).
- *      - Once `bitCount` reaches 8, the buffer is full and we write it to the binary output stream using `out.put()`,
- *        then reset `buffer` and `bitCount` to 0.
- *      - When the file ends, if we have a partially filled buffer (i.e. `bitCount > 0`), we pad the remaining bits with
- *        zeros by shifting the buffer left by `8 - bitCount` positions, write the final byte, and flush the stream.
- * 
- * 2. Unpacking (BitReader):
- *    - To decompress, we read the packed bytes back from the file one byte at a time and extract individual bits:
- *      - We maintain a byte buffer (`uint8_t buffer`) and a counter (`bitCount`) representing the number of unread bits in the buffer.
- *      - When `bitCount` is 0, we read the next byte from the stream, fill the buffer, and set `bitCount` to 8.
- *      - To read a bit, we extract the Most Significant Bit (MSB) by shifting the buffer right by 7 and bitwise-ANDing with 1: `(buffer >> 7) & 1`.
- *      - We then shift the buffer left by 1 (`buffer <<= 1`) to position the next bit at the MSB, and decrement `bitCount`.
- * 
- * 3. Handling Padding (Original File Size Tracking):
- *    - Since the last byte of the compressed file may be padded with dummy zeros, reading bits blindly until the end of the file
- *      would result in decoding extra dummy characters.
- *    - To prevent this, the compressor writes the exact total number of characters (`original_size`) in the file header.
- *    - The decompressor decodes exactly `original_size` characters by traversing the tree and then stops, ignoring any
- *      remaining padding bits in the final byte.
- * 
- * 4. Store Mode Fallback:
- *    - To handle small files, we write a 1-byte mode flag at the beginning of the compressed file:
- *      - Flag `0` (STORE): The file is written as-is without compression. Useful if header overhead > original size.
- *      - Flag `1` (COMPRESS): The file is compressed using Huffman coding.
- */
-
 #include <iostream>
 #include <fstream>
 #include <queue>
@@ -58,7 +22,7 @@ struct HuffmanNode {
     HuffmanNode(uint64_t freq, uint32_t nodeId, HuffmanNode* l, HuffmanNode* r)
         : character(0), frequency(freq), id(nodeId), left(l), right(r) {}
 
-    // Recursive destructor to prevent memory leaks
+    // Recursive destructor to prevent memory leaks in the tree
     ~HuffmanNode() {
         delete left;
         delete right;
