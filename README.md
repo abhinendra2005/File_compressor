@@ -2,17 +2,17 @@
 
 A high-performance, command-line lossless file compressor and decompressor written in C++17. It utilizes the **Huffman Coding** algorithm to achieve entropy-based data compression. 
 
-The project has **zero external dependencies** and uses only standard C++ library headers.
+This project contains **zero external dependencies** and uses only standard C++ library headers.
 
 ---
 
 ## Key Features
 
-* **True Bit-Packing Logic**: Performs actual bit-level operations (`<<`, `|`, `&`) to pack 8 bits into a single byte (`unsigned char`) before writing to disk, avoiding slow and space-inefficient string representations of `"0"` and `"1"`.
-* **Automatic "Store Mode" Fallback**: Solves the "small files grow larger" problem. If the overhead of storing the Huffman frequency table exceeds the potential savings (common in tiny or highly random files), the compressor falls back to storing the raw file as-is with a single flag byte, guaranteeing the file never grows.
+* **Bit-Packing Logic**: The implementation uses bit-level operations (`<<`, `|`, `&`) to pack 8 bits into a single byte (`unsigned char`) before writing to disk, avoiding slow and space-inefficient string representations of `"0"` and `"1"`.
+* **"Store Mode" Fallback**: Solves the "small files grow larger" problem. If the overhead of storing the Huffman frequency table exceeds the potential savings (common in tiny or highly random files), the compressor automatically falls back to storing the raw file as-is with a single flag byte, guaranteeing the file never grows.
 * **Deterministic Tie-Breaking (Stable Tree Construction)**: Nodes with equal frequencies are ordered using sequential unique IDs. This guarantees that the compression and decompression phases construct the exact same binary tree, regardless of compile-time memory layouts or platform-specific sorting differences.
-* **Header & Padding Management**: Prepends the original file size to the compressed file. The decompressor decodes exactly this number of bytes and stops, seamlessly ignoring trailing padding bits in the final byte.
-* **Leak-Free Memory Management**: Destructors recursively traverse and delete tree nodes, ensuring zero heap memory leaks.
+* **Header & Padding Management**: The original file size is prepended to the compressed file. The decompressor decodes exactly this number of bytes and stops, ignoring trailing padding bits in the final byte.
+* **Memory Management**: Destructors recursively traverse and delete tree nodes, ensuring zero heap memory leaks in the application.
 
 ---
 
@@ -30,13 +30,13 @@ The compressed `.bin`/`.huf` file uses a custom structure defined as follows:
 
 ---
 
-## How It Works
+## How the Implementation Works
 
-1. **Analysis**: The compressor reads the input file and calculates byte frequencies.
+1. **Analysis**: The program reads the input file and calculates byte frequencies.
 2. **Evaluation**: It builds the Huffman tree and estimates the compressed output size (header + bitstream bytes).
 3. **Decision**:
-   * If **Compressed Size < Original Size**: Writes Mode Flag `1`, serializes the header, and compresses the file using packed bits.
-   * If **Compressed Size >= Original Size**: Writes Mode Flag `0` and copies the original file bytes directly.
+   * If **Compressed Size < Original Size**: It writes Mode Flag `1`, serializes the header, and compresses the file using packed bits.
+   * If **Compressed Size >= Original Size**: It writes Mode Flag `0` and copies the original file bytes directly.
 4. **Decompression**: The decompressor reads the first byte. If `0`, it copies the raw data. If `1`, it reads the frequency table, rebuilds the identical tree, and decodes the packed bits using a bit-by-bit reader.
 
 ---
@@ -59,9 +59,43 @@ Below are the benchmark results measured on various test files:
 
 ### Prerequisites
 * A C++17 compatible compiler (e.g., `g++` 7.0+, `clang++` 5.0+, or MSVC 2017+).
-* PowerShell (optional, for running automated test scripts).
+* PowerShell (optional, for running the automated test scripts).
 
 ### Compilation
-Compile the source using your C++ compiler. Optimizations (`-O3`) are highly recommended for faster I/O processing:
+Compile the source using a C++ compiler. Optimizations (`-O3`) are highly recommended for faster I/O processing:
 ```bash
 g++ -O3 -Wall -std=c++17 main.cpp -o compressor
+```
+
+### Usage
+
+#### 1. Compress a file:
+```bash
+./compressor -c input.txt compressed.bin
+```
+
+#### 2. Decompress a file:
+```bash
+./compressor -d compressed.bin restored.txt
+```
+
+#### 3. Verify matching integrity (Windows):
+```powershell
+fc.exe /b input.txt restored.txt
+```
+
+---
+
+## Automated Verification Scripts
+
+Two automated test scripts are provided to quickly run validation cases and measure performance:
+
+* **Edge Cases & Integrity Test** (runs standard text, empty, single-character, and binary file checks):
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\test.ps1
+  ```
+* **1 MB Load Test** (generates a 1 MB file, performs compression/decompression, and outputs metrics):
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\check_large.ps1
+  ```
+
